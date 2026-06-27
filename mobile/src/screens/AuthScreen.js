@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLanguage } from '../context/LanguageContext';
@@ -31,7 +31,7 @@ export default function AuthScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={[styles.title, isRtl && { textAlign: 'right' }]}>
         {isLogin ? t('login', lang) : t('register', lang)}
       </Text>
@@ -93,7 +93,7 @@ export default function AuthScreen({ navigation }) {
           {isLogin ? t('login', lang) : t('register', lang)}
         </Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
@@ -48,84 +48,87 @@ export default function CheckoutScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={[styles.container]}>
-      <Text style={[styles.title, isRtl && { textAlign: 'right' }]}>
-        {t('checkout', lang)}
-      </Text>
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isRtl && { textAlign: 'right' }]}>
-          {t('shippingAddress', lang)}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={[styles.container]}>
+        <Text style={[styles.title, isRtl && { textAlign: 'right' }]}>
+          {t('checkout', lang)}
         </Text>
-        <TextInput
-          style={[styles.input, isRtl && { textAlign: 'right' }]}
-          value={address}
-          onChangeText={setAddress}
-          placeholder="Address"
-        />
-        <TextInput
-          style={[styles.input, isRtl && { textAlign: 'right' }]}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder={t('phone', lang)}
-          keyboardType="phone-pad"
-        />
-        <TextInput
-          style={[styles.input, styles.textArea, isRtl && { textAlign: 'right' }]}
-          value={notes}
-          onChangeText={setNotes}
-          placeholder={t('notes', lang)}
-          multiline
-        />
-      </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isRtl && { textAlign: 'right' }]}>
-          {t('payment', lang)}
-        </Text>
-        <TouchableOpacity
-          style={[
-            styles.paymentOption,
-            paymentMethod === 'cod' && styles.paymentActive,
-          ]}
-          onPress={() => setPaymentMethod('cod')}
-        >
-          <Ionicons
-            name={paymentMethod === 'cod' ? 'radio-button-on' : 'radio-button-off'}
-            size={20}
-            color="#FF6B9D"
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, isRtl && { textAlign: 'right' }]}>
+            {t('shippingAddress', lang)}
+          </Text>
+          <TextInput
+            style={[styles.input, isRtl && { textAlign: 'right' }]}
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Address"
           />
-          <Text style={styles.paymentText}>{t('cashOnDelivery', lang)}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.paymentOption,
-            paymentMethod === 'card' && styles.paymentActive,
-          ]}
-          onPress={() => setPaymentMethod('card')}
-        >
-          <Ionicons
-            name={paymentMethod === 'card' ? 'radio-button-on' : 'radio-button-off'}
-            size={20}
-            color="#FF6B9D"
+          <TextInput
+            style={[styles.input, isRtl && { textAlign: 'right' }]}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder={t('phone', lang)}
+            keyboardType="phone-pad"
           />
-          <Text style={styles.paymentText}>{t('cardPayment', lang)}</Text>
+          <TextInput
+            style={[styles.input, styles.textArea, isRtl && { textAlign: 'right' }]}
+            value={notes}
+            onChangeText={setNotes}
+            placeholder={t('notes', lang)}
+            multiline
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, isRtl && { textAlign: 'right' }]}>
+            {t('payment', lang)}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              paymentMethod === 'cod' && styles.paymentActive,
+            ]}
+            onPress={() => setPaymentMethod('cod')}
+          >
+            <Ionicons
+              name={paymentMethod === 'cod' ? 'radio-button-on' : 'radio-button-off'}
+              size={20}
+              color="#FF6B9D"
+            />
+            <Text style={styles.paymentText}>{t('cashOnDelivery', lang)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.paymentOption,
+              paymentMethod === 'card' && styles.paymentActive,
+            ]}
+            onPress={() => setPaymentMethod('card')}
+          >
+            <Ionicons
+              name={paymentMethod === 'card' ? 'radio-button-on' : 'radio-button-off'}
+              size={20}
+              color="#FF6B9D"
+            />
+            <Text style={styles.paymentText}>{t('cardPayment', lang)}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.totalSection}>
+          <Text style={styles.totalLabel}>{t('total', lang)}</Text>
+          <Text style={styles.totalValue}>{total.toFixed(2)} ₪</Text>
+        </View>
+
+        <TouchableOpacity style={styles.orderBtn} onPress={handleOrder}>
+          <Text style={styles.orderBtnText}>{t('placeOrder', lang)}</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.totalSection}>
-        <Text style={styles.totalLabel}>{t('total', lang)}</Text>
-        <Text style={styles.totalValue}>{total.toFixed(2)} ₪</Text>
-      </View>
-
-      <TouchableOpacity style={styles.orderBtn} onPress={handleOrder}>
-        <Text style={styles.orderBtnText}>{t('placeOrder', lang)}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#fff' },
   container: { flex: 1, backgroundColor: '#fff', padding: 20 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 20 },
   section: { marginBottom: 24 },

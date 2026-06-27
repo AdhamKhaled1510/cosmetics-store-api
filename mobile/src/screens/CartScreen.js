@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, Image,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, Image, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
@@ -43,18 +43,18 @@ export default function CartScreen({ navigation }) {
 
   if (items.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
+      <SafeAreaView style={styles.emptyContainer}>
         <Ionicons name="cart-outline" size={80} color="#ddd" />
         <Text style={styles.emptyText}>{t('emptyCart', lang)}</Text>
         <TouchableOpacity style={styles.shopBtn} onPress={() => navigation.navigate('Home')}>
           <Text style={styles.shopBtnText}>{t('startShopping', lang)}</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={items}
         renderItem={renderItem}
@@ -70,7 +70,7 @@ export default function CartScreen({ navigation }) {
           <Text style={styles.checkoutText}>{t('checkout', lang)}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

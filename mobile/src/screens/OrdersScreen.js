@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, StyleSheet, ActivityIndicator, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
@@ -27,9 +27,9 @@ export default function OrdersScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center}>
         <ActivityIndicator size="large" color="#FF6B9D" />
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -75,7 +75,7 @@ export default function OrdersScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={orders}
         renderItem={renderOrder}
@@ -85,7 +85,7 @@ export default function OrdersScreen() {
           <Text style={styles.empty}>{t('noProducts', lang)}</Text>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

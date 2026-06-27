@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, View, I18nManager } from 'react-native';
+import { ActivityIndicator, View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
@@ -35,6 +35,19 @@ function MainTabs() {
         tabBarActiveTintColor: '#FF6B9D',
         tabBarInactiveTintColor: '#999',
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 0,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: -4 },
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
@@ -56,8 +69,12 @@ export default function App() {
 
   if (!initialRoute) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#FF6B9D" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FAFAFA' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 20 }}>
+          <Text style={{ fontSize: 36, fontWeight: '900', color: '#1a1a1a', letterSpacing: -1 }}>Glow</Text>
+          <Text style={{ fontSize: 36, fontWeight: '900', color: '#FF6B9D', letterSpacing: -1 }}>RX</Text>
+        </View>
+        <ActivityIndicator size="small" color="#FF6B9D" />
       </View>
     );
   }
@@ -68,7 +85,7 @@ export default function App() {
         <NavigationContainer>
           <Stack.Navigator
             initialRouteName={initialRoute}
-            screenOptions={{ headerShown: false, direction: 'rtl' }}
+            screenOptions={{ headerShown: false }}
           >
             <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="Main" component={MainTabs} />
@@ -76,7 +93,7 @@ export default function App() {
             <Stack.Screen name="Checkout" component={CheckoutScreen} />
           </Stack.Navigator>
         </NavigationContainer>
-        <StatusBar style="auto" />
+        <StatusBar style="dark" />
       </CartProvider>
     </LanguageProvider>
   );
