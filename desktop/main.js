@@ -33,7 +33,7 @@ const appIcon = createIcon();
 
 app.on('ready', () => {
   createWindow();
-  createTray();
+  try { createTray(); } catch (e) { console.log('Tray not supported on this system'); }
   pollOrders();
 });
 

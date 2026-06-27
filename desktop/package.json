@@ -1,6 +1,7 @@
 {
   "name": "glowrx-manager",
   "version": "1.0.0",
+  "author": "GlowRX",
   "description": "GlowRX - نظام إدارة المتجر",
   "main": "main.js",
   "scripts": {
@@ -39,9 +40,8 @@
       "createStartMenuShortcut": true
     }
   },
-  "dependencies": {},
   "devDependencies": {
     "electron": "^42.5.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.13.3"
   }
 }
