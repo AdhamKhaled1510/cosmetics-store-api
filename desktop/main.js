@@ -44,24 +44,32 @@ app.on('window-all-closed', () => {
 });
 
 function createWindow() {
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: sw, height: sh } = primaryDisplay.workAreaSize;
+
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 900,
-    minHeight: 600,
+    width: Math.min(1280, sw - 40),
+    height: Math.min(800, sh - 40),
+    minWidth: 800,
+    minHeight: 500,
     title: 'GlowRX Manager - لوحة التحكم',
     icon: appIcon,
+    backgroundColor: '#0f0a12',
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
-    show: false,
   });
 
   mainWindow.loadURL(ADMIN_URL);
 
-  mainWindow.once('ready-to-show', () => { mainWindow.show(); });
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
+    mainWindow.show();
+  });
 
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
