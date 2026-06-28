@@ -13,8 +13,10 @@ router.post('/register', (req, res) => {
   if (existing) return res.status(400).json({ error: 'Email already exists' });
   const hashed = bcrypt.hashSync(password, 10);
   const result = dbRun('INSERT INTO users (name, email, password, phone, address) VALUES (?, ?, ?, ?, ?)', [name, email, hashed, phone || null, address || null]);
+  const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+  dbRun('UPDATE users SET verification_code = ? WHERE id = ?', [verifyCode, result.lastInsertRowid]);
   const token = jwt.sign({ id: result.lastInsertRowid, email, role: 'customer' }, JWT_SECRET);
-  res.json({ token, user: { id: result.lastInsertRowid, name, email, role: 'customer' } });
+  res.json({ token, user: { id: result.lastInsertRowid, name, email, role: 'customer', email_verified: 0 } });
 });
 
 router.post('/login', (req, res) => {
@@ -22,7 +24,7 @@ router.post('/login', (req, res) => {
   const user = dbGet('SELECT * FROM users WHERE email = ?', [email]);
   if (!user || !bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: 'Invalid credentials' });
   const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, email_verified: user.email_verified } });
 });
 
 router.get('/profile', (req, res) => {
@@ -35,22 +37,76 @@ router.get('/profile', (req, res) => {
   } catch { res.status(401).json({ error: 'Invalid token' }); }
 });
 
+// Send verification code
+router.post('/send-verification', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = dbGet('SELECT * FROM users WHERE id = ?', [decoded.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.email_verified) return res.json({ message: 'Email already verified' });
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    dbRun('UPDATE users SET verification_code = ? WHERE id = ?', [code, user.id]);
+    // Try to send email via nodemailer if configured
+    const smtpHost = process.env.SMTP_HOST;
+    if (smtpHost) {
+      try {
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+          host: smtpHost, port: parseInt(process.env.SMTP_PORT) || 587,
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        });
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || process.env.SMTP_USER,
+          to: user.email, subject: 'GlowRX - Verification Code',
+          text: 'Your verification code is: ' + code,
+          html: '<h2>GlowRX</h2><p>Your verification code is: <strong>' + code + '</strong></p>'
+        });
+      } catch(e) { console.error('Email send failed:', e.message); }
+    }
+    res.json({ message: 'Verification code sent', code: smtpHost ? undefined : code });
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+});
+
+// Verify email
+router.post('/verify-email', (req, res) => {
+  const { code } = req.body;
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token || !code) return res.status(400).json({ error: 'Token and code required' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = dbGet('SELECT * FROM users WHERE id = ?', [decoded.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.email_verified) return res.json({ message: 'Already verified' });
+    if (user.verification_code !== code) return res.status(400).json({ error: 'Invalid code' });
+    dbRun('UPDATE users SET email_verified = 1, verification_code = NULL WHERE id = ?', [user.id]);
+    res.json({ message: 'Email verified' });
+  } catch { res.status(401).json({ error: 'Invalid token' }); }
+});
+
 // Google OAuth - redirect to Google
 router.get('/google', (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://cosmetics-store-api.vercel.app/api/auth/google/callback';
+  const defaultRedirect = process.env.GOOGLE_REDIRECT_URI || 'https://cosmetics-store-api.vercel.app/api/auth/google/callback';
   if (!clientId) return res.status(500).json({ error: 'Google OAuth not configured' });
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email%20profile`;
+  const redirectUri = req.query.redirect_uri || defaultRedirect;
+  const state = req.query.redirect_uri ? Buffer.from(req.query.redirect_uri).toString('base64') : '';
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(defaultRedirect)}&response_type=code&scope=email%20profile${state ? '&state=' + encodeURIComponent(state) : ''}`;
   res.redirect(url);
 });
 
 // Google OAuth - callback
 router.get('/google/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://cosmetics-store-api.vercel.app/api/auth/google/callback';
   const frontendUrl = process.env.FRONTEND_URL || 'https://adhamkhaled1510.github.io/glowrx-store';
+  // Check if state contains a custom redirect (from mobile app)
+  let customRedirect = null;
+  if (state) { try { const decoded = Buffer.from(state, 'base64').toString(); if (decoded.startsWith('http') || decoded.startsWith('glowrx://')) customRedirect = decoded; } catch {} }
   if (!code || !clientId || !clientSecret) return res.status(400).json({ error: 'Missing params' });
   try {
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -59,10 +115,10 @@ router.get('/google/callback', async (req, res) => {
       body: JSON.stringify({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' })
     });
     const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) return res.redirect(frontendUrl + '?error=google_auth_failed');
+    if (!tokenData.access_token) return res.redirect(customRedirect || frontendUrl + '?error=google_auth_failed');
     const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: 'Bearer ' + tokenData.access_token } });
     const googleUser = await userRes.json();
-    if (!googleUser.email) return res.redirect(frontendUrl + '?error=no_email');
+    if (!googleUser.email) return res.redirect(customRedirect || frontendUrl + '?error=no_email');
     let user = dbGet('SELECT * FROM users WHERE email = ?', [googleUser.email]);
     if (user) {
       if (!user.google_id) dbRun('UPDATE users SET google_id = ? WHERE id = ?', [googleUser.id, user.id]);
@@ -74,9 +130,10 @@ router.get('/google/callback', async (req, res) => {
     const jwt = require('jsonwebtoken');
     const JWT_SECRET = process.env.JWT_SECRET || 'cosmetics-store-secret-key';
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
-    res.redirect(frontendUrl + '?token=' + token);
+    const dest = customRedirect ? customRedirect + '?token=' + token : frontendUrl + '?token=' + token;
+    res.redirect(dest);
   } catch(e) {
-    res.redirect(frontendUrl + '?error=google_auth_error');
+    res.redirect(customRedirect || frontendUrl + '?error=google_auth_error');
   }
 });
 

@@ -8,6 +8,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'cosmetics-store-secret-key';
 router.post('/', (req, res) => {
   const { items, total, payment_method, shipping_address, phone, notes, coupon_code } = req.body;
   if (!items || !total || !payment_method) return res.status(400).json({ error: 'Items, total, and payment method are required' });
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Login required to place order' });
+  let userId = null;
+  try { 
+    const decoded = jwt.verify(token, JWT_SECRET);
+    userId = decoded.id;
+    // Check email verification
+    const user = dbGet('SELECT email_verified FROM users WHERE id = ?', [userId]);
+    if (user && !user.email_verified) return res.status(403).json({ error: 'Please verify your email before ordering' });
+  } catch { return res.status(401).json({ error: 'Login required to place order' }); }
   // Handle coupon
   let finalNotes = notes || '';
   if (coupon_code) {
@@ -17,9 +27,6 @@ router.post('/', (req, res) => {
       finalNotes = (finalNotes ? finalNotes + ' | ' : '') + 'Coupon: ' + coupon_code + ' (' + coupon.discount_percent + '% off)';
     }
   }
-  const token = req.headers.authorization?.split(' ')[1];
-  let userId = null;
-  if (token) { try { userId = jwt.verify(token, JWT_SECRET).id; } catch {} }
   const result = dbRun('INSERT INTO orders (user_id, items, total, payment_method, shipping_address, phone, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [userId, JSON.stringify(items), total, payment_method, shipping_address || null, phone || null, finalNotes || null]);
   res.json({ id: result.lastInsertRowid, message: 'Order placed successfully' });

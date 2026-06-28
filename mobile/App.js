@@ -6,8 +6,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { CartProvider } from './src/context/CartContext';
+import { getProfile } from './src/api';
 
 import HomeScreen from './src/screens/HomeScreen';
 import ProductDetailsScreen from './src/screens/ProductDetailsScreen';
@@ -16,9 +18,11 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AuthScreen from './src/screens/AuthScreen';
+import VerifyScreen from './src/screens/VerifyScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const API_URL = 'https://cosmetics-store-api.vercel.app/api';
 
 function MainTabs() {
   return (
@@ -62,9 +66,37 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('token').then(token => {
-      setInitialRoute(token ? 'Main' : 'Auth');
+    (async () => {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        try {
+          await getProfile();
+          setInitialRoute('Main');
+          return;
+        } catch {
+          await AsyncStorage.multiRemove(['token', 'user']);
+        }
+      }
+      setInitialRoute('Auth');
+    })();
+  }, []);
+
+  useEffect(() => {
+    const handler = ({ url }) => {
+      if (url && url.startsWith('glowrx://auth/callback')) {
+        const parsed = Linking.parse(url);
+        const token = parsed.queryParams?.token;
+        if (token) {
+          AsyncStorage.setItem('token', token);
+          setInitialRoute('Main');
+        }
+      }
+    };
+    const sub = Linking.addEventListener('url', handler);
+    Linking.getInitialURL().then(url => {
+      if (url) handler({ url });
     });
+    return () => sub?.remove();
   }, []);
 
   if (!initialRoute) {
@@ -91,6 +123,7 @@ export default function App() {
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
             <Stack.Screen name="Checkout" component={CheckoutScreen} />
+            <Stack.Screen name="Verify" component={VerifyScreen} />
           </Stack.Navigator>
         </NavigationContainer>
         <StatusBar style="dark" />
@@ -98,3 +131,5 @@ export default function App() {
     </LanguageProvider>
   );
 }
+
+export { API_URL };

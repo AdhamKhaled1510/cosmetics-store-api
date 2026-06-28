@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, SafeAreaView,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useCart } from '../context/CartContext';
-import { createOrder } from '../api';
+import { createOrder, validateCoupon } from '../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../i18n';
 
 export default function CheckoutScreen({ navigation }) {
@@ -17,34 +18,79 @@ export default function CheckoutScreen({ navigation }) {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponMsg, setCouponMsg] = useState('');
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
+  const [ordering, setOrdering] = useState(false);
 
-  const handleOrder = async () => {
-    if (!address || !phone) {
-      Alert.alert('', 'Please fill in address and phone');
+  const finalTotal = appliedCoupon
+    ? total - Math.round(total * appliedCoupon.discount_percent / 100)
+    : total;
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponMsg(lang === 'ar' ? 'أدخل كود الخصم' : 'Enter coupon code');
       return;
     }
-
+    setCheckingCoupon(true);
+    setCouponMsg('');
     try {
-      await createOrder({
+      const res = await validateCoupon({ code: couponCode, order_total: total });
+      if (res.data.valid) {
+        setAppliedCoupon(res.data);
+        setCouponMsg(
+          (lang === 'ar'
+            ? `✓ خصم ${res.data.discount_percent}% مطبق`
+            : `✓ ${res.data.discount_percent}% discount applied`)
+          + ` (-${Math.round(total * res.data.discount_percent / 100)} ₪)`
+        );
+      } else {
+        setAppliedCoupon(null);
+        setCouponMsg(res.data.error || (lang === 'ar' ? 'كود غير صالح' : 'Invalid code'));
+      }
+    } catch (err) {
+      setCouponMsg(lang === 'ar' ? 'خطأ في التحقق' : 'Validation error');
+    } finally { setCheckingCoupon(false); }
+  };
+
+  const handleOrder = async () => {
+    const userStr = await AsyncStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    if (!user) {
+      Alert.alert('', lang === 'ar' ? 'يجب تسجيل الدخول أولاً' : 'Please login first');
+      navigation.navigate('Auth');
+      return;
+    }
+    if (!user.email_verified) {
+      Alert.alert('', lang === 'ar' ? 'يرجى التحقق من بريدك الإلكتروني أولاً' : 'Please verify your email first');
+      navigation.navigate('Verify', { token: await AsyncStorage.getItem('token') });
+      return;
+    }
+    if (!address || !phone) {
+      Alert.alert('', lang === 'ar' ? 'يرجى ملء العنوان والهاتف' : 'Please fill in address and phone');
+      return;
+    }
+    setOrdering(true);
+    try {
+      const body = {
         items: items.map((i) => ({
-          id: i.id,
-          name_ar: i.name_ar,
-          name_en: i.name_en,
-          price: i.price,
-          qty: i.qty,
+          id: i.id, name_ar: i.name_ar, name_en: i.name_en, price: i.price, qty: i.qty,
         })),
-        total,
-        payment_method: paymentMethod === 'cod' ? 'cod' : 'card',
+        total: finalTotal,
+        payment_method: paymentMethod === 'cod' ? 'cash_on_delivery' : 'card',
         shipping_address: address,
         phone,
         notes,
-      });
+      };
+      if (appliedCoupon) body.coupon_code = couponCode;
+      await createOrder(body);
       Alert.alert('', t('orderPlaced', lang), [
-        { text: 'OK', onPress: () => { clearCart(); navigation.navigate('Orders'); } },
+        { text: 'OK', onPress: () => { clearCart(); setAppliedCoupon(null); setCouponCode(''); navigation.navigate('Orders'); } },
       ]);
     } catch (err) {
       Alert.alert('Error', err.message);
-    }
+    } finally { setOrdering(false); }
   };
 
   return (
@@ -62,7 +108,7 @@ export default function CheckoutScreen({ navigation }) {
             style={[styles.input, isRtl && { textAlign: 'right' }]}
             value={address}
             onChangeText={setAddress}
-            placeholder="Address"
+            placeholder={lang === 'ar' ? 'العنوان' : 'Address'}
           />
           <TextInput
             style={[styles.input, isRtl && { textAlign: 'right' }]}
@@ -78,6 +124,33 @@ export default function CheckoutScreen({ navigation }) {
             placeholder={t('notes', lang)}
             multiline
           />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, isRtl && { textAlign: 'right' }]}>
+            {lang === 'ar' ? 'كود الخصم' : 'Coupon'}
+          </Text>
+          <View style={styles.couponRow}>
+            <TextInput
+              style={[styles.input, styles.couponInput, isRtl && { textAlign: 'right' }]}
+              value={couponCode}
+              onChangeText={text => { setCouponCode(text.toUpperCase()); setAppliedCoupon(null); setCouponMsg(''); }}
+              placeholder={lang === 'ar' ? 'أدخل الكود' : 'Enter code'}
+              autoCapitalize="characters"
+            />
+            <TouchableOpacity style={styles.couponBtn} onPress={applyCoupon} disabled={checkingCoupon}>
+              {checkingCoupon ? (
+                <ActivityIndicator size="small" color="#FF6B9D" />
+              ) : (
+                <Text style={styles.couponBtnText}>{lang === 'ar' ? 'تطبيق' : 'Apply'}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          {couponMsg ? (
+            <Text style={[styles.couponMsg, appliedCoupon ? styles.couponSuccess : styles.couponError]}>
+              {couponMsg}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -116,11 +189,18 @@ export default function CheckoutScreen({ navigation }) {
 
         <View style={styles.totalSection}>
           <Text style={styles.totalLabel}>{t('total', lang)}</Text>
-          <Text style={styles.totalValue}>{total.toFixed(2)} ₪</Text>
+          <Text style={styles.totalValue}>
+            {finalTotal.toFixed(2)} ₪
+            {appliedCoupon && <Text style={styles.originalPrice}>  {total.toFixed(2)} ₪</Text>}
+          </Text>
         </View>
 
-        <TouchableOpacity style={styles.orderBtn} onPress={handleOrder}>
-          <Text style={styles.orderBtnText}>{t('placeOrder', lang)}</Text>
+        <TouchableOpacity style={styles.orderBtn} onPress={handleOrder} disabled={ordering}>
+          {ordering ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.orderBtnText}>{t('placeOrder', lang)}</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -142,6 +222,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   textArea: { height: 80, textAlignVertical: 'top' },
+  couponRow: { flexDirection: 'row', gap: 8 },
+  couponInput: { flex: 1, marginBottom: 0 },
+  couponBtn: {
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FF6B9D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF0F5',
+  },
+  couponBtnText: { color: '#FF6B9D', fontWeight: '700', fontSize: 14 },
+  couponMsg: { fontSize: 13, marginTop: 8 },
+  couponSuccess: { color: '#10b981' },
+  couponError: { color: '#ef4444' },
   paymentOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,18 +251,21 @@ const styles = StyleSheet.create({
   totalSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 20,
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
   totalLabel: { fontSize: 20, fontWeight: '600' },
   totalValue: { fontSize: 22, fontWeight: 'bold', color: '#FF6B9D' },
+  originalPrice: { fontSize: 14, fontWeight: '400', color: '#999', textDecorationLine: 'line-through' },
   orderBtn: {
     backgroundColor: '#FF6B9D',
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
+    marginBottom: 30,
   },
   orderBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 });

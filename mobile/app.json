@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "متجر مستحضرات التجميل",
+    "name": "GlowRX",
     "slug": "cosmetics-store",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "glowrx",
     "splash": {
       "backgroundColor": "#FF6B9D"
     },
@@ -17,10 +18,18 @@
       "adaptiveIcon": {
         "backgroundColor": "#FF6B9D"
       },
-      "package": "com.cosmetics.store"
+      "package": "com.cosmetics.store",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [{ "scheme": "glowrx" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ]
   }
 }

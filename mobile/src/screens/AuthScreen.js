@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { useLanguage } from '../context/LanguageContext';
 import { login, register } from '../api';
 import { t } from '../i18n';
+
+const API_URL = 'https://cosmetics-store-api.vercel.app/api';
 
 export default function AuthScreen({ navigation }) {
   const { lang } = useLanguage();
@@ -15,8 +19,10 @@ export default function AuthScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    setLoading(true);
     try {
       const data = isLogin
         ? await login({ email, password })
@@ -24,9 +30,36 @@ export default function AuthScreen({ navigation }) {
       const { token, user } = data.data;
       await AsyncStorage.setItem('token', token);
       await AsyncStorage.setItem('user', JSON.stringify(user));
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      if (isLogin) {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      } else {
+        const code = data.data.verification_code;
+        navigation.navigate('Verify', { token, code });
+      }
     } catch (err) {
       Alert.alert('', err.response?.data?.error || err.message);
+    } finally { setLoading(false); }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const redirectUri = Linking.createURL('auth/callback');
+      const result = await WebBrowser.openAuthSessionAsync(
+        `${API_URL}/auth/google?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        redirectUri
+      );
+      if (result.type === 'success' && result.url) {
+        const parsed = Linking.parse(result.url);
+        const token = parsed.queryParams?.token;
+        if (token) {
+          await AsyncStorage.setItem('token', token);
+          navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        } else {
+          Alert.alert('', lang === 'ar' ? 'فشل تسجيل الدخول عبر Google' : 'Google login failed');
+        }
+      }
+    } catch (err) {
+      Alert.alert('', err.message);
     }
   };
 
@@ -88,9 +121,26 @@ export default function AuthScreen({ navigation }) {
         />
       )}
 
-      <TouchableOpacity style={styles.btn} onPress={handleSubmit}>
-        <Text style={styles.btnText}>
-          {isLogin ? t('login', lang) : t('register', lang)}
+      <TouchableOpacity style={styles.btn} onPress={handleSubmit} disabled={loading}>
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.btnText}>
+            {isLogin ? t('login', lang) : t('register', lang)}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>{lang === 'ar' ? 'أو' : 'or'}</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleLogin}>
+        <Text style={styles.googleIcon}>G</Text>
+        <Text style={styles.googleBtnText}>
+          {lang === 'ar' ? 'متابعة عبر Google' : 'Continue with Google'}
         </Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -127,4 +177,28 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   btnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  divider: {
+    flexDirection: 'row', alignItems: 'center', marginVertical: 20,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#eee' },
+  dividerText: { marginHorizontal: 12, color: '#999', fontSize: 14 },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+  },
+  googleIcon: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#4285F4',
+    marginRight: 10,
+    width: 24,
+    textAlign: 'center',
+  },
+  googleBtnText: { fontSize: 16, fontWeight: '600', color: '#555' },
 });

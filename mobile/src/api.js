@@ -21,5 +21,6 @@ export const register = (data) => api.post('/auth/register', data);
 export const getProfile = () => api.get('/auth/profile');
 export const createOrder = (data) => api.post('/orders', data);
 export const getOrders = () => api.get('/orders');
+export const validateCoupon = (data) => api.post('/admin/coupons/validate', data);
 
 export default api;
