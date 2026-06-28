@@ -122,7 +122,7 @@ router.get('/users/:id', adminAuth, async (req, res) => {
 // --- Dashboard Stats ---
 router.get('/stats', adminAuth, async (req, res) => {
   const totalOrders = await dbGet('SELECT COUNT(*) as count FROM orders');
-  const totalRevenue = await dbGet('SELECT COALESCE(SUM(total),0) as total FROM orders WHERE status != "cancelled"');
+  const totalRevenue = await dbGet("SELECT COALESCE(SUM(total),0) as total FROM orders WHERE status != 'cancelled'");
   const totalUsers = await dbGet('SELECT COUNT(*) as count FROM users');
   const totalProducts = await dbGet('SELECT COUNT(*) as count FROM products');
   const pendingOrders = await dbGet('SELECT COUNT(*) as count FROM orders WHERE status = "pending"');
