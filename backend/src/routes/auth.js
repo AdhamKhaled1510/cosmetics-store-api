@@ -81,13 +81,18 @@ router.post('/send-verification', async (req, res) => {
           secure: process.env.SMTP_SECURE === 'true',
           auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
         });
-        await transporter.sendMail({
+        const info = await transporter.sendMail({
           from: process.env.SMTP_FROM || process.env.SMTP_USER,
           to: user.email, subject: 'GlowRX - Verification Code',
           text: 'Your verification code is: ' + code,
           html: '<h2>GlowRX</h2><p>Your verification code is: <strong>' + code + '</strong></p>'
         });
-      } catch(e) { console.error('Email send failed:', e.message); }
+        console.log('Email sent successfully:', info.messageId);
+      } catch(e) {
+        console.error('Email send failed:', e.message, e.code);
+      }
+    } else {
+      console.log('SMTP not configured, showing code on screen');
     }
     res.json({ message: 'Verification code sent', code: smtpHost ? undefined : code });
   } catch { res.status(401).json({ error: 'Invalid token' }); }
