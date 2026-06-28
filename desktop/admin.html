@@ -259,6 +259,7 @@ select.status-select{
 .order-detail-grid .field .value{font-size:15px;font-weight:600;margin-top:4px;color:var(--text)}
 
 /* ─── Scrollbar ─── */
+.hidden{display:none!important}
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(139,47,142,.3);border-radius:2px}
@@ -522,7 +523,9 @@ function showSection(s) {
   document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
   document.querySelectorAll('.content > div[id^="section-"]').forEach(d => d.classList.add('hidden'));
   document.getElementById('section-' + s).classList.remove('hidden');
-  event?.target?.closest('a')?.classList.add('active');
+  const activeLink = event?.target?.closest('a');
+  if (activeLink) activeLink.classList.add('active');
+  else document.querySelector(`.sidebar-nav a[onclick*="${s}"]`)?.classList.add('active');
   const titles = { dashboard: '📊 ' + t('الإحصائيات','Dashboard'), orders: '📦 ' + t('الطلبات','Orders'), products: '🛍️ ' + t('المنتجات','Products'), users: '👥 ' + t('العملاء','Customers') };
   document.getElementById('pageTitle').textContent = titles[s] || s;
   renderCurrentSection();
@@ -673,7 +676,7 @@ async function openProductModal(id = null) {
   document.getElementById('pCategory').innerHTML = (catData.categories||[]).map(c => `<option value="${c.id}">${c.name_ar} / ${c.name_en}</option>`).join('');
   if (id) {
     try { const data = await api('/admin/products'); const p = data.products.find(x => x.id === id);
-      if (p) { ['pNameAr','pNameEn','pDescAr','pDescEn'].forEach(f => document.getElementById(f).value = p[f.replace('p','').toLowerCase()]||'');
+      if (p) { const fm = {pNameAr:'name_ar',pNameEn:'name_en',pDescAr:'description_ar',pDescEn:'description_en'}; Object.entries(fm).forEach(([id,key]) => document.getElementById(id).value = p[key]||'');
         document.getElementById('pPrice').value = p.price; document.getElementById('pStock').value = p.stock; document.getElementById('pCategory').value = p.category_id; document.getElementById('pFeatured').value = p.featured;
         document.getElementById('pImages').value = JSON.parse(p.images||'[]').join('\n'); }
     } catch(e) { showToast(e.message, 'error'); }
