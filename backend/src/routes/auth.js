@@ -4,12 +4,22 @@ const jwt = require('jsonwebtoken');
 const { dbGet, dbRun } = require('../db.js');
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'cosmetics-store-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '30d';
+const crypto = require('crypto');
+
+function requireEnv() {
+  if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
+}
+requireEnv();
 
 function sanitize(str) {
   if (typeof str !== 'string') return str;
   return str.replace(/[<>"'()]/g, '').trim();
+}
+
+function generateCode() {
+  return crypto.randomInt(100000, 999999).toString();
 }
 
 router.post('/register', (req, res) => {
@@ -26,8 +36,9 @@ router.post('/register', (req, res) => {
   if (existing) return res.status(400).json({ error: 'Email already exists' });
   const hashed = bcrypt.hashSync(password, 10);
   const result = dbRun('INSERT INTO users (name, email, password, phone, address) VALUES (?, ?, ?, ?, ?)', [name, email, hashed, phone || null, address || null]);
-  const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
-  dbRun('UPDATE users SET verification_code = ? WHERE id = ?', [verifyCode, result.lastInsertRowid]);
+  const verifyCode = generateCode();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  dbRun('UPDATE users SET verification_code = ?, verification_expires_at = ? WHERE id = ?', [verifyCode, expiresAt, result.lastInsertRowid]);
   const token = jwt.sign({ id: result.lastInsertRowid, email, role: 'customer' }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
   res.json({ token, user: { id: result.lastInsertRowid, name, email, role: 'customer', email_verified: 0 } });
 });
@@ -61,8 +72,9 @@ router.post('/send-verification', async (req, res) => {
     const user = dbGet('SELECT * FROM users WHERE id = ?', [decoded.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.email_verified) return res.json({ message: 'Email already verified' });
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    dbRun('UPDATE users SET verification_code = ? WHERE id = ?', [code, user.id]);
+    const code = generateCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    dbRun('UPDATE users SET verification_code = ?, verification_expires_at = ? WHERE id = ?', [code, expiresAt, user.id]);
     // Try to send email via nodemailer if configured
     const smtpHost = process.env.SMTP_HOST;
     if (smtpHost) {
@@ -95,6 +107,7 @@ router.post('/verify-email', (req, res) => {
     const user = dbGet('SELECT * FROM users WHERE id = ?', [decoded.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (user.email_verified) return res.json({ message: 'Already verified' });
+    if (user.verification_expires_at && new Date(user.verification_expires_at) < new Date()) return res.status(400).json({ error: 'Code expired, request a new one' });
     if (user.verification_code !== code) return res.status(400).json({ error: 'Invalid code' });
     dbRun('UPDATE users SET email_verified = 1, verification_code = NULL WHERE id = ?', [user.id]);
     res.json({ message: 'Email verified' });
@@ -138,12 +151,10 @@ router.get('/google/callback', async (req, res) => {
     if (user) {
       if (!user.google_id) dbRun('UPDATE users SET google_id = ? WHERE id = ?', [googleUser.id, user.id]);
     } else {
-      const hashedPass = require('bcryptjs').hashSync(Math.random().toString(36), 10);
+      const hashedPass = bcrypt.hashSync(Math.random().toString(36), 10);
       const result = dbRun("INSERT INTO users (name, email, password, google_id) VALUES (?, ?, ?, ?)", [googleUser.name || googleUser.email, googleUser.email, hashedPass, googleUser.id]);
       user = { id: result.lastInsertRowid, email: googleUser.email, name: googleUser.name || googleUser.email, role: 'customer' };
     }
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'cosmetics-store-secret-key';
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
     const dest = customRedirect ? customRedirect + '?token=' + token : frontendUrl + '?token=' + token;
     res.redirect(dest);

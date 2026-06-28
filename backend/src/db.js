@@ -18,6 +18,7 @@ async function initDb() {
   try { db.run('ALTER TABLE users ADD COLUMN google_id TEXT'); } catch(e) {}
   try { db.run('ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0'); } catch(e) {}
   try { db.run('ALTER TABLE users ADD COLUMN verification_code TEXT'); } catch(e) {}
+  try { db.run('ALTER TABLE users ADD COLUMN verification_expires_at TEXT'); } catch(e) {}
   ready = true;
 }
 

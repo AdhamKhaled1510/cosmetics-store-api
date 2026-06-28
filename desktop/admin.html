@@ -580,6 +580,10 @@ function enterApp() {
   document.getElementById('mainApp').style.display = '';
   document.getElementById('themeBtn').textContent = dark ? '☀️' : '🌙';
   showSection('dashboard'); checkAPI();
+  // Save creds for polling
+  if (window.electronAPI) {
+    window.electronAPI.saveAdminCreds({ token, adminKey });
+  }
 }
 
 function logout() {

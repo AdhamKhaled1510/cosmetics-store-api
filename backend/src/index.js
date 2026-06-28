@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const { initDb, dbRun, dbGet, dbAll } = require('./db.js');
+const { initDb, dbRun, dbGet } = require('./db.js');
 const productsRouter = require('./routes/products.js');
 const authRouter = require('./routes/auth.js');
 const ordersRouter = require('./routes/orders.js');
@@ -132,14 +132,6 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/admin', adminRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/debug', (req, res) => {
-  try {
-    const cats = dbAll('SELECT * FROM categories');
-    res.json({ cats, ready });
-  } catch(e) {
-    res.json({ error: e.message });
-  }
-});
 
 // 404 handler
 app.use((req, res) => {

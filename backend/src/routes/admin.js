@@ -4,8 +4,9 @@ const bcrypt = require('bcryptjs');
 const { dbAll, dbGet, dbRun } = require('../db.js');
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'cosmetics-store-secret-key';
-const ADMIN_KEY = process.env.ADMIN_KEY || 'admin123';
+const JWT_SECRET = process.env.JWT_SECRET;
+const ADMIN_KEY = process.env.ADMIN_KEY;
+if (!JWT_SECRET || !ADMIN_KEY) throw new Error('JWT_SECRET and ADMIN_KEY environment variables are required');
 
 function adminAuth(req, res, next) {
   const key = req.headers['x-admin-key'];

@@ -37,6 +37,16 @@ app.on('ready', () => {
   pollOrders();
 });
 
+// IPC handler for admin credentials
+const { ipcMain } = require('electron');
+ipcMain.on('save-admin-creds', (event, creds) => {
+  try {
+    const fs = require('fs');
+    const cfgPath = path.join(app.getPath('userData'), 'admin-config.json');
+    fs.writeFileSync(cfgPath, JSON.stringify(creds), 'utf8');
+  } catch (e) { console.error('Failed to save creds:', e.message); }
+});
+
 app.on('before-quit', () => { isQuitting = true; });
 
 app.on('window-all-closed', () => {
@@ -140,12 +150,27 @@ function createTray() {
 // Poll for new orders every 30 seconds
 let lastOrderCount = 0;
 
+function getAdminCreds() {
+  try {
+    const fs = require('fs');
+    const cfgPath = path.join(app.getPath('userData'), 'admin-config.json');
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      return cfg;
+    }
+  } catch {}
+  return {};
+}
+
 function pollOrders() {
   setInterval(async () => {
     try {
-      const res = await fetch('https://cosmetics-store-api.vercel.app/api/admin/stats', {
-        headers: { 'x-admin-key': 'admin123' },
-      });
+      const creds = getAdminCreds();
+      const headers = { 'Content-Type': 'application/json' };
+      if (creds.token) headers['Authorization'] = 'Bearer ' + creds.token;
+      else if (creds.adminKey) headers['x-admin-key'] = creds.adminKey;
+      else return; // No credentials yet
+      const res = await fetch('https://cosmetics-store-api.vercel.app/api/admin/stats', { headers });
       const data = await res.json();
       const count = data.stats.totalOrders;
       if (count > lastOrderCount && lastOrderCount > 0) {
