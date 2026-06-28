@@ -14,7 +14,7 @@ async function query(sql, params = []) {
       requests: [
         {
           type: 'execute',
-          stmt: { sql, args: params.map(p => p === undefined ? null : p) },
+          stmt: { sql, args: params.map(p => p === undefined || p === null ? { type: 'null', value: null } : { type: typeof p === 'number' ? (Number.isInteger(p) ? 'integer' : 'float') : 'text', value: p }) },
         },
       ],
     }),
