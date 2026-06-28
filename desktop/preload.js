@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   close: () => ipcRenderer.send('close'),
   onNotification: (callback) => ipcRenderer.on('notification', (_, msg) => callback(msg)),
   saveAdminCreds: (creds) => ipcRenderer.send('save-admin-creds', creds),
+  openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
 });

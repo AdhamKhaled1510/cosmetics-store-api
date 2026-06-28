@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GlowRX Manager - لوحة التحكم</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://cosmetics-store-api.vercel.app; img-src 'self' data:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://cosmetics-store-api.vercel.app; img-src 'self' data: blob:; media-src 'self' blob:;">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -509,8 +509,13 @@ select.status-select{
       <div class="form-group"><label>مميز</label><select id="pFeatured"><option value="0">لا</option><option value="1">نعم</option></select></div>
     </div>
     <div class="form-group"><label>الصور (رابط لكل سطر)</label><textarea id="pImages" placeholder="https://images.unsplash.com/photo-..."></textarea></div>
-    <div class="form-group"><label>أو ارفع صورة</label><input type="file" id="pImageUpload" accept="image/*" onchange="uploadImage(event)"><br>
-      <canvas id="pImagePreview" style="max-width:150px;max-height:150px;margin-top:6px;border-radius:8px;display:none"></canvas>
+    <div class="form-group"><label>أو ارفع صورة</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm btn-outline" onclick="selectImage()" type="button">📁 اختر صورة</button>
+        <span id="pImageName" style="font-size:12px;color:var(--text2)"></span>
+        <input type="file" id="pImageUpload" accept="image/*" onchange="uploadImage(event)" style="display:none">
+      </div>
+      <canvas id="pImagePreview" style="max-width:150px;max-height:150px;margin-top:8px;border-radius:8px;display:none"></canvas>
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="saveProduct()">💾 حفظ</button>
@@ -869,6 +874,7 @@ async function openProductModal(id = null) {
   document.getElementById('pFeatured').value = '0';
   document.getElementById('pImagePreview').style.display = 'none';
   document.getElementById('pImageUpload').value = '';
+  document.getElementById('pImageName').textContent = '';
   document.getElementById('pFeatured').value = '0';
   const catRes = await fetch(API + '/products'); const catData = await catRes.json();
   document.getElementById('pCategory').innerHTML = (catData.categories||[]).map(c => `<option value="${c.id}">${c.name_ar} / ${c.name_en}</option>`).join('');
@@ -883,28 +889,48 @@ async function openProductModal(id = null) {
 }
 function closeProductModal() { document.getElementById('productModal').classList.remove('show'); editingProductId = null; }
 
+function selectImage() {
+  if (window.electronAPI && window.electronAPI.openFileDialog) {
+    window.electronAPI.openFileDialog().then(result => {
+      if (result && result.dataUrl) {
+        const fileData = { target: { files: [{ name: result.fileName }] } };
+        processImageData(result.dataUrl, fileData);
+      }
+    }).catch(() => {
+      document.getElementById('pImageUpload').click();
+    });
+  } else {
+    document.getElementById('pImageUpload').click();
+  }
+}
+
+function processImageData(dataUrl, fileData) {
+  const img = new Image();
+  img.onload = function() {
+    const maxW = 400, maxH = 400;
+    let w = img.width, h = img.height;
+    if (w > maxW) { h *= maxW / w; w = maxW; }
+    if (h > maxH) { w *= maxH / h; h = maxH; }
+    const c = document.getElementById('pImagePreview');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    const resized = c.toDataURL('image/jpeg', 0.7);
+    c.style.display = 'block';
+    const ta = document.getElementById('pImages');
+    ta.value = ta.value ? ta.value + '\n' + resized : resized;
+    document.getElementById('pImageName').textContent = fileData.target.files[0].name;
+  };
+  img.src = dataUrl;
+}
+
 function uploadImage(e) {
   const file = e.target.files[0];
   if (!file) return;
+  document.getElementById('pImageName').textContent = file.name;
   const reader = new FileReader();
   reader.onload = function(ev) {
-    const img = new Image();
-    img.onload = function() {
-      const maxW = 400, maxH = 400;
-      let w = img.width, h = img.height;
-      if (w > maxW) { h *= maxW / w; w = maxW; }
-      if (h > maxH) { w *= maxH / h; h = maxH; }
-      const c = document.getElementById('pImagePreview');
-      c.width = w; c.height = h;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      const dataUrl = c.toDataURL('image/jpeg', 0.7);
-      c.style.display = 'block';
-      // Add to images textarea
-      const ta = document.getElementById('pImages');
-      ta.value = ta.value ? ta.value + '\n' + dataUrl : dataUrl;
-    };
-    img.src = ev.target.result;
+    processImageData(ev.target.result, e);
   };
   reader.readAsDataURL(file);
 }

@@ -38,13 +38,31 @@ app.on('ready', () => {
 });
 
 // IPC handler for admin credentials
-const { ipcMain } = require('electron');
+const { ipcMain, dialog } = require('electron');
 ipcMain.on('save-admin-creds', (event, creds) => {
   try {
     const fs = require('fs');
     const cfgPath = path.join(app.getPath('userData'), 'admin-config.json');
     fs.writeFileSync(cfgPath, JSON.stringify(creds), 'utf8');
   } catch (e) { console.error('Failed to save creds:', e.message); }
+});
+
+// IPC handler for file dialog
+ipcMain.handle('open-file-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] }],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  const fs = require('fs');
+  const filePath = result.filePaths[0];
+  const fileName = path.basename(filePath);
+  const data = fs.readFileSync(filePath);
+  const ext = path.extname(filePath).toLowerCase().replace('.', '');
+  const mimeTypes = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
+  const mime = mimeTypes[ext] || 'image/jpeg';
+  const base64 = data.toString('base64');
+  return { fileName, dataUrl: `data:${mime};base64,${base64}` };
 });
 
 app.on('before-quit', () => { isQuitting = true; });
